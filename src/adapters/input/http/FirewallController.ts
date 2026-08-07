@@ -4,18 +4,37 @@ import { RuleMode, RuleType } from '../../../core/domain/FirewallRule';
 
 type AppError = Error & { code?: string; status?: number };
 
+/**
+ * Sends a standardised JSON error response.
+ * @param res     - Express response object.
+ * @param status  - HTTP status code.
+ * @param code    - Machine-readable error code.
+ * @param message - Human-readable description.
+ */
 function errorResponse(res: Response, status: number, code: string, message: string): void {
   res.status(status).json({ status: 'error', code, message });
 }
 
+/**
+ * Returns true when mode is exactly "blacklist" or "whitelist".
+ * @param mode - Value to check.
+ */
 function isValidMode(mode: unknown): mode is RuleMode {
   return mode === 'blacklist' || mode === 'whitelist';
 }
 
+/**
+ * Returns true when val is an array with at least one element.
+ * @param val - Value to check.
+ */
 function isNonEmptyArray(val: unknown): val is unknown[] {
   return Array.isArray(val) && val.length > 0;
 }
 
+/**
+ * Returns true when ip is a valid dotted-decimal IPv4 address (each octet 0–255).
+ * @param ip - Value to check.
+ */
 function isValidIPv4(ip: unknown): ip is string {
   if (typeof ip !== 'string') return false;
   const parts = ip.split('.');
@@ -26,15 +45,27 @@ function isValidIPv4(ip: unknown): ip is string {
   });
 }
 
+/**
+ * Returns true when domain contains no protocol, path segment, or port suffix.
+ * @param domain - Value to check.
+ */
 function isValidDomain(domain: unknown): domain is string {
   if (typeof domain !== 'string') return false;
   return !domain.includes('://') && !domain.includes('/') && !/:\d+$/.test(domain);
 }
 
+/**
+ * Returns true when port is an integer in the valid TCP/UDP range 1–65535.
+ * @param port - Value to check.
+ */
 function isValidPort(port: unknown): port is number {
   return Number.isInteger(port) && (port as number) >= 1 && (port as number) <= 65535;
 }
 
+/**
+ * Returns true when every element of arr is an integer.
+ * @param arr - Array whose elements are checked.
+ */
 function isIntegerArray(arr: unknown[]): arr is number[] {
   return arr.every(Number.isInteger);
 }
@@ -42,6 +73,10 @@ function isIntegerArray(arr: unknown[]): arr is number[] {
 export class FirewallController {
   constructor(private readonly service: IFirewallService) {}
 
+  /**
+   * POST /api/firewall/ips
+   * Validates and adds one or more IPv4 addresses to the blacklist or whitelist.
+   */
   addIps = (req: Request, res: Response): void => {
     const { values, mode } = req.body;
     if (!isNonEmptyArray(values)) {
@@ -61,6 +96,10 @@ export class FirewallController {
     res.status(201).json({ type: 'ip', mode, values: added.map(({ id, value, active }) => ({ id, value, active })), status: 'success' });
   };
 
+  /**
+   * POST /api/firewall/domains
+   * Validates and adds one or more domain names to the blacklist or whitelist.
+   */
   addDomains = (req: Request, res: Response): void => {
     const { values, mode } = req.body;
     if (!isNonEmptyArray(values)) {
@@ -80,6 +119,10 @@ export class FirewallController {
     res.status(201).json({ type: 'domain', mode, values: added.map(({ id, value, active }) => ({ id, value, active })), status: 'success' });
   };
 
+  /**
+   * POST /api/firewall/ports
+   * Validates and adds one or more ports to the blacklist or whitelist.
+   */
   addPorts = (req: Request, res: Response): void => {
     const { values, mode } = req.body;
     if (!isNonEmptyArray(values)) {
@@ -99,6 +142,10 @@ export class FirewallController {
     res.status(201).json({ type: 'port', mode, values: added.map(({ id, value, active }) => ({ id, value, active })), status: 'success' });
   };
 
+  /**
+   * DELETE /api/firewall/rules
+   * Removes one or more rules by ID regardless of type.
+   */
   removeRules = (req: Request, res: Response): void => {
     const { ids } = req.body;
     if (!isNonEmptyArray(ids) || !isIntegerArray(ids)) {
@@ -114,6 +161,10 @@ export class FirewallController {
     }
   };
 
+  /**
+   * GET /api/firewall/rules
+   * Returns all rules grouped by type and mode. Accepts an optional ?type= query param.
+   */
   getRules = (req: Request, res: Response): void => {
     const { type } = req.query;
     if (type !== undefined && type !== 'ip' && type !== 'domain' && type !== 'port') {
@@ -124,6 +175,10 @@ export class FirewallController {
     res.status(200).json(result);
   };
 
+  /**
+   * PATCH /api/firewall/rules/status
+   * Updates the active flag of one or more rules identified by ID.
+   */
   updateStatus = (req: Request, res: Response): void => {
     const { ids, active } = req.body;
     if (!isNonEmptyArray(ids) || !isIntegerArray(ids)) {

@@ -12,6 +12,12 @@ const app = express();
 
 app.use(express.json());
 
+/**
+ * Logging middleware — prints the HTTP method and path of every incoming request.
+ * @param req  - Incoming request.
+ * @param _res - Unused response object.
+ * @param next - Passes control to the next middleware.
+ */
 app.use((req: Request, _res: Response, next: NextFunction) => {
   console.log(`[${req.method}] ${req.path}`);
   next();
