@@ -1,4 +1,4 @@
-import app from './infrastructure/config/app';
+import app from './app';
 
 const PORT = 3000;
 

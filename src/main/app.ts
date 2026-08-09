@@ -1,8 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { InMemoryFirewallRepository } from '../../adapters/output/InMemoryFirewallRepository';
-import { FirewallService } from '../../core/use-cases/FirewallService';
-import { FirewallController } from '../../adapters/input/http/FirewallController';
-import { createFirewallRouter } from '../../adapters/input/http/FirewallRouter';
+import { InMemoryFirewallRepository } from '../adapters/output/persistence/inMemory/InMemoryFirewallRepository';
+import { FirewallService } from '../application/service/FirewallService';
+import { FirewallController } from '../adapters/input/controller/FirewallController';
+import { createFirewallRouter } from '../adapters/input/http/FirewallRouter';
 
 const repo = new InMemoryFirewallRepository();
 const service = new FirewallService(repo);

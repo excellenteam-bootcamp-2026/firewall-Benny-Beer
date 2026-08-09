@@ -1,5 +1,5 @@
-import { FirewallRule } from '../../core/domain/FirewallRule';
-import { IFirewallRepository } from '../../core/ports/output/IFirewallRepository';
+import { FirewallRule } from '../../../../domain/FirewallRule';
+import { IFirewallRepository } from  '../../../../application/repository/IFirewallRepository';
 
 /** In-memory implementation of IFirewallRepository. All data is lost on process restart. */
 export class InMemoryFirewallRepository implements IFirewallRepository {

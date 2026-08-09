@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { FirewallController } from './FirewallController';
+import { FirewallController } from '../controller/FirewallController';
 
 /**
  * Builds and returns an Express Router with all six firewall API endpoints mounted.

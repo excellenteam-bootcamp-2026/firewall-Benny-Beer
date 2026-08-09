@@ -1,6 +1,6 @@
-import { FirewallRule, RuleType, RuleMode } from '../domain/FirewallRule';
-import { IFirewallRepository } from '../ports/output/IFirewallRepository';
-import { IFirewallService, GetRulesResult, GroupedByMode } from '../ports/input/IFirewallService';
+import { FirewallRule, RuleType, RuleMode } from '../../domain/FirewallRule';
+import { IFirewallRepository } from '../repository/IFirewallRepository';
+import { IFirewallService, GetRulesResult, GroupedByMode } from './IFirewallService';
 
 export class FirewallService implements IFirewallService {
   constructor(private readonly repo: IFirewallRepository) {}

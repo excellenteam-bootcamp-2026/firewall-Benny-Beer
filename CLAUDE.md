@@ -1,39 +1,69 @@
-# Project: EXCELLENTEAM App
+# CLAUDE.md
 
-A Node.js/TypeScript backend built with hexagonal architecture (ports & adapters).
-
-## Stack
-- TypeScript
-- Node.js
-- Express
-- npm
-
-## Architecture
-This project follows hexagonal architecture. See `rules.md` for the full rules —
-the short version:
-
-- `src/core` = business logic. Must NEVER import Express, a database driver,
-  or anything from `src/adapters`.
-- `src/core/ports` = interfaces only (input ports = how the app is driven,
-  output ports = what the app needs from the outside world).
-- `src/adapters` = concrete implementations that plug into ports
-  (`adapters/input/http` = Express controllers, `adapters/output` = repositories, etc).
-- `src/infrastructure` = wiring/config — the only place allowed to know about
-  both the core and the concrete adapters at once.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
-- `npm install` — install dependencies
-- `npm run dev` — run the dev server with nodemon + ts-node
-- `npm run build` — compile TypeScript to `dist/`
-- `npm start` — run the compiled app
 
-## Git workflow
-This repo follows GitHub Flow:
-- `master` is the stable, always-deployable branch.
-- All work happens on feature branches (e.g. `feature/xyz`), merged via Pull Request.
-- Do not commit directly to `master`.
+```bash
+npm run dev       # dev server with hot-reload (ts-node + nodemon, no compile needed)
+npm run build     # compile TypeScript → dist/
+npm start         # run compiled output (requires build first)
+```
 
-## Notes for Claude
-- Full coding/architecture rules live in `rules.md` — read it before making
-  structural changes.
-- Ask before modifying `tsconfig.json`, `package.json`, or anything in `.claude/`.
+No test runner is configured yet (`npm test` exits with an error). Tests live in `tests/unit/`, `tests/integration/`, `tests/fixtures/` but are empty.
+
+## Architecture
+
+Hexagonal architecture (ports & adapters). Dependency rule: **outer layers import inner layers, never the reverse.**
+
+```
+src/
+├── domain/          # Pure business entities — no framework imports allowed
+├── applications/    # Use cases (FirewallService) + port interfaces (IFirewallService, IFirewallRepository)
+├── adapters/
+│   ├── input/
+│   │   ├── controller/   # FirewallController — thin: validates request, calls service, formats response
+│   │   └── http/         # FirewallRouter — mounts the 6 REST endpoints on an Express Router
+│   └── output/
+│       └── persistence/
+│           ├── inMemory/  # InMemoryFirewallRepository (active implementation)
+│           └── postgres/  # placeholder, not implemented
+└── main/            # Wiring only: app.ts constructs instances and registers middleware; index.ts starts the server
+```
+
+> **Pending renames to match spec:** `applications/` → `application/`, `adapters/input/` → `adapters/inbound/`, `adapters/output/` → `adapters/outbound/`
+
+### Key boundaries
+
+- `domain/` and `applications/` must never import from `adapters/`, `main/`, or any framework (Express, DB drivers).
+- `adapters/` may import from `applications/` and `domain/`, never from `main/`.
+- `main/` is the only place that knows about both concrete adapters and use cases simultaneously.
+- Controllers must stay thin: input validation + service call + response formatting only. No business logic.
+
+### Domain model (`domain/FirewallRule.ts`)
+
+`FirewallRule` has: `id` (auto-incremented), `value` (string | number), `type` (`'ip' | 'domain' | 'port'`), `mode` (`'blacklist' | 'whitelist'`), `active` (boolean).
+
+### API surface (6 endpoints)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/firewall/ips` | Add IPv4 rules |
+| `POST` | `/api/firewall/domains` | Add domain rules |
+| `POST` | `/api/firewall/ports` | Add port rules |
+| `DELETE` | `/api/firewall/rules` | Remove rules by `ids[]` |
+| `GET` | `/api/firewall/rules` | Get all rules, optional `?type=ip\|domain\|port` |
+| `PATCH` | `/api/firewall/rules/status` | Update `active` flag by `ids[]` |
+
+## Conventions
+
+- `camelCase` for variables/functions, `PascalCase` for classes and interfaces.
+- One class/interface per file.
+- `strict` mode is on in `tsconfig.json` — do not weaken it.
+- Commit messages: short imperative line (e.g. `Add domain validation`). Branch per feature: `feature/<short-description>`. Never commit directly to `master`.
+
+## Before doing these, ask first
+
+- Changing `tsconfig.json` compiler options.
+- Adding new runtime dependencies.
+- Renaming the three folders listed under "Pending renames" (imports must all update together).

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { IFirewallService } from '../../../core/ports/input/IFirewallService';
-import { RuleMode, RuleType } from '../../../core/domain/FirewallRule';
+import { IFirewallService } from '../../../application/service/IFirewallService';
+import { RuleMode, RuleType } from '../../../domain/FirewallRule';
 
 type AppError = Error & { code?: string; status?: number };
 
