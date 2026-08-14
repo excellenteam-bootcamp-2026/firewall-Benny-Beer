@@ -1,200 +1,21 @@
 import { Request, Response } from 'express';
-import { IFirewallService } from '../../../application/service/IFirewallService';
-import { RuleMode, RuleType } from '../../../domain/FirewallRule';
-
-type AppError = Error & { code?: string; status?: number };
-
-/**
- * Sends a standardised JSON error response.
- * @param res     - Express response object.
- * @param status  - HTTP status code.
- * @param code    - Machine-readable error code.
- * @param message - Human-readable description.
- */
-function errorResponse(res: Response, status: number, code: string, message: string): void {
-  res.status(status).json({ status: 'error', code, message });
-}
-
-/**
- * Returns true when mode is exactly "blacklist" or "whitelist".
- * @param mode - Value to check.
- */
-function isValidMode(mode: unknown): mode is RuleMode {
-  return mode === 'blacklist' || mode === 'whitelist';
-}
-
-/**
- * Returns true when val is an array with at least one element.
- * @param val - Value to check.
- */
-function isNonEmptyArray(val: unknown): val is unknown[] {
-  return Array.isArray(val) && val.length > 0;
-}
-
-/**
- * Returns true when ip is a valid dotted-decimal IPv4 address (each octet 0–255).
- * @param ip - Value to check.
- */
-function isValidIPv4(ip: unknown): ip is string {
-  if (typeof ip !== 'string') return false;
-  const parts = ip.split('.');
-  if (parts.length !== 4) return false;
-  return parts.every((p) => {
-    const n = Number(p);
-    return /^\d+$/.test(p) && n >= 0 && n <= 255;
-  });
-}
-
-/**
- * Returns true when domain contains no protocol, path segment, or port suffix.
- * @param domain - Value to check.
- */
-function isValidDomain(domain: unknown): domain is string {
-  if (typeof domain !== 'string') return false;
-  return !domain.includes('://') && !domain.includes('/') && !/:\d+$/.test(domain);
-}
-
-/**
- * Returns true when port is an integer in the valid TCP/UDP range 1–65535.
- * @param port - Value to check.
- */
-function isValidPort(port: unknown): port is number {
-  return Number.isInteger(port) && (port as number) >= 1 && (port as number) <= 65535;
-}
-
-/**
- * Returns true when every element of arr is an integer.
- * @param arr - Array whose elements are checked.
- */
-function isIntegerArray(arr: unknown[]): arr is number[] {
-  return arr.every(Number.isInteger);
-}
+import { RuleRepository } from '../../../application/ports/RuleRepository';
+import { addRules } from '../../../application/useCases/addRules';
+import { AddRuleRequest } from '../http/Validation';
 
 export class FirewallController {
-  constructor(private readonly service: IFirewallService) {}
+  constructor(private repository: RuleRepository) {}
 
-  /**
-   * POST /api/firewall/ips
-   * Validates and adds one or more IPv4 addresses to the blacklist or whitelist.
-   */
   addIps = (req: Request, res: Response): void => {
-    const { values, mode } = req.body;
-    if (!isNonEmptyArray(values)) {
-      errorResponse(res, 400, 'INVALID_VALUES', 'values must be a non-empty array.');
-      return;
-    }
-    if (!isValidMode(mode)) {
-      errorResponse(res, 400, 'INVALID_MODE', 'mode must be blacklist or whitelist.');
-      return;
-    }
-    const invalid = values.find((v) => !isValidIPv4(v));
-    if (invalid !== undefined) {
-      errorResponse(res, 400, 'INVALID_IP', `Invalid IPv4 address: ${invalid}`);
-      return;
-    }
-    const added = this.service.addRules(values as string[], 'ip', mode);
-    res.status(201).json({ type: 'ip', mode, values: added.map(({ id, value, active }) => ({ id, value, active })), status: 'success' });
-  };
+    const { values, mode } = req.body as AddRuleRequest;
 
-  /**
-   * POST /api/firewall/domains
-   * Validates and adds one or more domain names to the blacklist or whitelist.
-   */
-  addDomains = (req: Request, res: Response): void => {
-    const { values, mode } = req.body;
-    if (!isNonEmptyArray(values)) {
-      errorResponse(res, 400, 'INVALID_VALUES', 'values must be a non-empty array.');
-      return;
-    }
-    if (!isValidMode(mode)) {
-      errorResponse(res, 400, 'INVALID_MODE', 'mode must be blacklist or whitelist.');
-      return;
-    }
-    const invalid = values.find((v) => !isValidDomain(v));
-    if (invalid !== undefined) {
-      errorResponse(res, 400, 'INVALID_DOMAIN', `Invalid domain (must not include protocol, path, or port): ${invalid}`);
-      return;
-    }
-    const added = this.service.addRules(values as string[], 'domain', mode);
-    res.status(201).json({ type: 'domain', mode, values: added.map(({ id, value, active }) => ({ id, value, active })), status: 'success' });
-  };
+    const added = addRules(this.repository, 'ip', values, mode);
 
-  /**
-   * POST /api/firewall/ports
-   * Validates and adds one or more ports to the blacklist or whitelist.
-   */
-  addPorts = (req: Request, res: Response): void => {
-    const { values, mode } = req.body;
-    if (!isNonEmptyArray(values)) {
-      errorResponse(res, 400, 'INVALID_VALUES', 'values must be a non-empty array.');
-      return;
-    }
-    if (!isValidMode(mode)) {
-      errorResponse(res, 400, 'INVALID_MODE', 'mode must be blacklist or whitelist.');
-      return;
-    }
-    const invalid = values.find((v) => !isValidPort(v));
-    if (invalid !== undefined) {
-      errorResponse(res, 400, 'INVALID_PORT', 'Ports must be integers between 1 and 65535.');
-      return;
-    }
-    const added = this.service.addRules(values as number[], 'port', mode);
-    res.status(201).json({ type: 'port', mode, values: added.map(({ id, value, active }) => ({ id, value, active })), status: 'success' });
-  };
-
-  /**
-   * DELETE /api/firewall/rules
-   * Removes one or more rules by ID regardless of type.
-   */
-  removeRules = (req: Request, res: Response): void => {
-    const { ids } = req.body;
-    if (!isNonEmptyArray(ids) || !isIntegerArray(ids)) {
-      errorResponse(res, 400, 'INVALID_IDS', 'ids must be a non-empty array of integers.');
-      return;
-    }
-    try {
-      const removed = this.service.removeRules(ids);
-      res.status(200).json({ removed, status: 'success' });
-    } catch (err) {
-      const e = err as AppError;
-      res.status(e.status ?? 500).json({ status: 'error', code: e.code ?? 'ERROR', message: e.message });
-    }
-  };
-
-  /**
-   * GET /api/firewall/rules
-   * Returns all rules grouped by type and mode. Accepts an optional ?type= query param.
-   */
-  getRules = (req: Request, res: Response): void => {
-    const { type } = req.query;
-    if (type !== undefined && type !== 'ip' && type !== 'domain' && type !== 'port') {
-      errorResponse(res, 400, 'INVALID_TYPE', 'type query param must be ip, domain, or port.');
-      return;
-    }
-    const result = this.service.getRules(type as RuleType | undefined);
-    res.status(200).json(result);
-  };
-
-  /**
-   * PATCH /api/firewall/rules/status
-   * Updates the active flag of one or more rules identified by ID.
-   */
-  updateStatus = (req: Request, res: Response): void => {
-    const { ids, active } = req.body;
-    if (!isNonEmptyArray(ids) || !isIntegerArray(ids)) {
-      errorResponse(res, 400, 'INVALID_IDS', 'ids must be a non-empty array of integers.');
-      return;
-    }
-    if (typeof active !== 'boolean') {
-      errorResponse(res, 400, 'INVALID_ACTIVE', 'active must be a boolean.');
-      return;
-    }
-    try {
-      const updated = this.service.updateStatus(ids, active);
-      res.status(200).json({ updated, status: 'success' });
-    } catch (err) {
-      const e = err as AppError;
-      res.status(e.status ?? 500).json({ status: 'error', code: e.code ?? 'ERROR', message: e.message });
-    }
+    res.status(201).json({
+      type: 'ip',
+      mode,
+      values: added.map(({ id, rule }) => ({ id, value: rule.value, active: rule.active })),
+      status: 'success',
+    });
   };
 }

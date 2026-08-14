@@ -1,19 +1,15 @@
 import { Router } from 'express';
 import { FirewallController } from '../controller/FirewallController';
+import { validateAddRule } from './Middleware';
 
 /**
- * Builds and returns an Express Router with all six firewall API endpoints mounted.
+ * Builds an Express Router with the firewall API endpoints mounted.
  * @param controller - Controller instance whose handler methods are bound to each route.
  */
 export function createFirewallRouter(controller: FirewallController): Router {
   const router = Router();
 
-  router.post('/api/firewall/ips', controller.addIps);
-  router.post('/api/firewall/domains', controller.addDomains);
-  router.post('/api/firewall/ports', controller.addPorts);
-  router.delete('/api/firewall/rules', controller.removeRules);
-  router.get('/api/firewall/rules', controller.getRules);
-  router.patch('/api/firewall/rules/status', controller.updateStatus);
+  router.post('/api/firewall/ips', validateAddRule, controller.addIps);
 
   return router;
 }
