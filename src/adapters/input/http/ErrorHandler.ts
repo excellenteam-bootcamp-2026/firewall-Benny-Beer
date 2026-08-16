@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { InvalidRequestError } from './Errors';
 import { InvalidRuleValueError } from '../../../domain/rules';
+import { RuleNotFoundError } from '../../../application/errors';
 
 export function errorHandler(
   err: unknown,
@@ -15,6 +16,11 @@ export function errorHandler(
 
   if (err instanceof InvalidRuleValueError) {
     res.status(400).json({ status: 'error', code: err.code, message: err.message });
+    return;
+  }
+
+  if (err instanceof RuleNotFoundError) {
+    res.status(404).json({ status: 'error', code: 'RULE_NOT_FOUND', message: err.message });
     return;
   }
 

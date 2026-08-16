@@ -1,9 +1,18 @@
 import { InvalidRequestError } from './Errors';
-import { RuleMode } from '../../../domain/rules';
+import { RuleMode, RuleType } from '../../../domain/rules';
 
 export interface AddRuleRequest {
   values: string[];
   mode: RuleMode;
+}
+
+export interface RemoveRulesRequest {
+  ids: number[];
+}
+
+export interface UpdateStatusRequest {
+  ids: number[];
+  active: boolean;
 }
 
 /**
@@ -30,4 +39,50 @@ export function validateAddRuleRequest(body: unknown): AddRuleRequest {
   }
 
   return { values: values.map(String), mode };
+}
+
+function validateIds(ids: unknown): number[] {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new InvalidRequestError('ids must be a non-empty array.');
+  }
+  if (!ids.every((id) => typeof id === 'number' && Number.isInteger(id))) {
+    throw new InvalidRequestError('ids must contain only integers.');
+  }
+  return ids;
+}
+
+export function validateRemoveRulesRequest(body: unknown): RemoveRulesRequest {
+  if (typeof body !== 'object' || body === null) {
+    throw new InvalidRequestError('Request body must be an object.');
+  }
+
+  const { ids } = body as Record<string, unknown>;
+
+  return { ids: validateIds(ids) };
+}
+
+export function validateUpdateStatusRequest(body: unknown): UpdateStatusRequest {
+  if (typeof body !== 'object' || body === null) {
+    throw new InvalidRequestError('Request body must be an object.');
+  }
+
+  const { ids, active } = body as Record<string, unknown>;
+
+  if (typeof active !== 'boolean') {
+    throw new InvalidRequestError('active must be a boolean.');
+  }
+
+  return { ids: validateIds(ids), active };
+}
+
+const VALID_RULE_TYPES: RuleType[] = ['ip', 'domain', 'port'];
+
+export function validateGetRulesQuery(query: unknown): RuleType | undefined {
+  if (query === undefined) {
+    return undefined;
+  }
+  if (typeof query !== 'string' || !VALID_RULE_TYPES.includes(query as RuleType)) {
+    throw new InvalidRequestError('type must be one of "ip", "domain", or "port".');
+  }
+  return query as RuleType;
 }

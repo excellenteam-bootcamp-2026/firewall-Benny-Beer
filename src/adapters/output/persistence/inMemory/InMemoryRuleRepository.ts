@@ -1,45 +1,30 @@
-import { Rule, RuleMode } from '../../../../domain/rules';
-import { RuleRepository } from '../../../../application/ports/RuleRepository';
-
-export interface StoredRule {
-  id: number;
-  rule: Rule;
-}
+import { Rule, RuleType } from '../../../../domain/rules';
+import { RuleMode } from '../../../../domain/rules/RuleTypes';
+import { RuleRepository, StoredRule } from '../../../../application/ports/RuleRepository';
 
 export class InMemoryRuleRepository implements RuleRepository {
   private nextId = 1;
 
-  private blackRules = new Map<number, Rule>();
-  private whiteRules = new Map<number, Rule>();
-
-  private mapFor(mode: RuleMode): Map<number, Rule> {
-    return mode === 'blacklist' ? this.blackRules : this.whiteRules;
-  }
+  private rulesById = new Map<number, StoredRule>();
 
   add(rule: Rule, mode: RuleMode): number {
     const id = this.nextId++;
-    // for debug 
-    console.trace('Call stack for POST /api/firewall/ips');
-    this.mapFor(mode).set(id, rule);
+    this.rulesById.set(id, { id, rule, mode });
     return id;
   }
 
   search(id: number): StoredRule | undefined {
-    const fromBlack = this.blackRules.get(id);
-    if (fromBlack) return { id, rule: fromBlack };
-
-    const fromWhite = this.whiteRules.get(id);
-    if (fromWhite) return { id, rule: fromWhite };
-
-    return undefined;
+    return this.rulesById.get(id);
   }
 
   delete(id: number): StoredRule | undefined {
-    const found = this.search(id);
-    if (!found) return undefined;
-
-    this.blackRules.delete(id);
-    this.whiteRules.delete(id);
+    const found = this.rulesById.get(id);
+    if (found) this.rulesById.delete(id);
     return found;
+  }
+
+  findAll(type?: RuleType): StoredRule[] {
+    const all = Array.from(this.rulesById.values());
+    return type ? all.filter((stored) => stored.rule.type === type) : all;
   }
 }
