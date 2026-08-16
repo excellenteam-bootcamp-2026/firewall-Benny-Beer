@@ -3,6 +3,7 @@ import { InMemoryRuleRepository } from '../adapters/output/persistence/inMemory/
 import { FirewallController } from '../adapters/input/controller/FirewallController';
 import { createFirewallRouter } from '../adapters/input/http/FirewallRouter';
 import { errorHandler } from '../adapters/input/http/ErrorHandler';
+import { config } from './env';
 
 const repository = new InMemoryRuleRepository();
 const controller = new FirewallController(repository);
@@ -16,7 +17,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-app.use(createFirewallRouter(controller));
+app.use(createFirewallRouter(controller, config.apiPrefix));
 
 app.use(errorHandler);
 

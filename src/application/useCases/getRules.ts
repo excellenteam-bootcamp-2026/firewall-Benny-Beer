@@ -1,4 +1,4 @@
-import { RuleType } from '../../domain/rules';
+import { RuleType, RULE_TYPES } from '../../domain/rules';
 import { RuleRepository } from '../ports/RuleRepository';
 
 interface RuleSummary {
@@ -19,7 +19,7 @@ const KEY_BY_TYPE: Record<RuleType, 'ips' | 'domains' | 'ports'> = {
 };
 
 export function getRules(repository: RuleRepository, type?: RuleType): Record<string, RuleBucket> {
-  const types: RuleType[] = type ? [type] : ['ip', 'domain', 'port'];
+  const types: RuleType[] = type ? [type] : [...RULE_TYPES];
   const result: Record<string, RuleBucket> = {};
 
   for (const t of types) {

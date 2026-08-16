@@ -6,4 +6,5 @@ import './PortRule';
 
 export { Rule } from './Rule';
 export { InvalidRuleValueError } from './errors';
+export { RULE_TYPES } from './RuleTypes';
 export type { RuleType, RuleMode } from './RuleTypes';

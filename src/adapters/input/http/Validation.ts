@@ -1,5 +1,5 @@
 import { InvalidRequestError } from './Errors';
-import { RuleMode, RuleType } from '../../../domain/rules';
+import { RuleMode, RuleType, RULE_TYPES } from '../../../domain/rules';
 
 export interface AddRuleRequest {
   values: string[];
@@ -75,13 +75,11 @@ export function validateUpdateStatusRequest(body: unknown): UpdateStatusRequest 
   return { ids: validateIds(ids), active };
 }
 
-const VALID_RULE_TYPES: RuleType[] = ['ip', 'domain', 'port'];
-
 export function validateGetRulesQuery(query: unknown): RuleType | undefined {
   if (query === undefined) {
     return undefined;
   }
-  if (typeof query !== 'string' || !VALID_RULE_TYPES.includes(query as RuleType)) {
+  if (typeof query !== 'string' || !RULE_TYPES.includes(query as RuleType)) {
     throw new InvalidRequestError('type must be one of "ip", "domain", or "port".');
   }
   return query as RuleType;
