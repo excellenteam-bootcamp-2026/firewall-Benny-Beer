@@ -24,6 +24,11 @@ export function errorHandler(
     return;
   }
 
+  if (err instanceof SyntaxError && (err as { type?: string }).type === 'entity.parse.failed') {
+    res.status(400).json({ status: 'error', code: 'INVALID_REQUEST', message: 'Request body is not valid JSON.' });
+    return;
+  }
+
   console.error(err);
   res.status(500).json({
     status: 'error',
