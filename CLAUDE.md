@@ -9,7 +9,10 @@ npm run dev       # dev server with hot-reload (tsx watch, no compile needed)
 npm run build     # compile TypeScript → dist/
 npm start         # run compiled output (requires build first)
 npm test          # run unit tests (node:test via tsx)
+npx tsx --test tests/unit/domain/rules/IpRule.test.ts   # run a single test file
 ```
+
+`tests/` mirrors `src/`'s layout (e.g. `tests/unit/domain/rules/IpRule.test.ts` tests `src/domain/rules/IpRule.ts`).
 
 `tsx` runs TypeScript directly. Do not reintroduce `ts-node` — it is incompatible with the
 installed `typescript` v7 (the Go rewrite) and crashes on load.
@@ -49,7 +52,7 @@ src/
 
 Two distinct concerns, deliberately kept apart:
 
-- **Request shape** (`adapters/input/http/Validation.ts`) — is `values` a non-empty array? is `mode` one of the two allowed strings? Type-agnostic, so every add-endpoint reuses `validateAddRule` unchanged.
+- **Request shape** — `validateAddRuleRequest` in `adapters/input/http/Validation.ts` is the pure check (is `values` a non-empty array? is `mode` one of the two allowed strings?); `validateAddRule` in `adapters/input/http/Middleware.ts` wraps it as Express middleware and forwards failures via `next(err)`. Type-agnostic, so every add-endpoint reuses `validateAddRule` unchanged.
 - **Business rules** (`domain/rules/*Type.ts`) — is this a real IPv4 / bare domain / port in range? Throws `InvalidRuleValueError` with a `code` (`INVALID_IP`, `INVALID_DOMAIN`, `INVALID_PORT`).
 
 `ErrorHandler.ts` maps both to the spec's error response. Adding an error case means throwing a typed error, not writing status-code logic in a controller.

@@ -18,6 +18,8 @@ export class InMemoryRuleRepository implements RuleRepository {
 
   add(rule: Rule, mode: RuleMode): number {
     const id = this.nextId++;
+    // for debug 
+    console.trace('Call stack for POST /api/firewall/ips');
     this.mapFor(mode).set(id, rule);
     return id;
   }

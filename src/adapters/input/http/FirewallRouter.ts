@@ -9,7 +9,9 @@ import { validateAddRule } from './Middleware';
 export function createFirewallRouter(controller: FirewallController): Router {
   const router = Router();
 
-  router.post('/api/firewall/ips', validateAddRule, controller.addIps);
+  router.post('/api/firewall/ips', validateAddRule, controller.addRule('ip'));
+  router.post('/api/firewall/domains', validateAddRule, controller.addRule('domain'));
+  router.post('/api/firewall/ports', validateAddRule, controller.addRule('port'));
 
   return router;
 }
