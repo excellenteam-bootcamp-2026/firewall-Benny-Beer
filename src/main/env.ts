@@ -19,6 +19,7 @@ const envSchema = z.object({
     .string()
     .url()
     .refine(hasPort, 'must include a port, e.g. postgresql://user:pass@host:5432/db'),
+  DB_CONNECTION_INTERVAL: z.coerce.number().int().positive(),
 });
 
 export function parseEnv(raw: NodeJS.ProcessEnv) {
@@ -48,5 +49,6 @@ export const config = {
   env: env.ENV,
   port: env.PORT,
   databaseUri: DATABASE_URI_BY_ENV[env.ENV],
+  dbConnectionInterval: env.DB_CONNECTION_INTERVAL,
   apiPrefix: API_PREFIX,
 } as const;
