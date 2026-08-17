@@ -10,13 +10,13 @@ export interface AddedRule {
  * Builds every rule before persisting any, so a single invalid value rejects
  * the whole batch — the API contract has no partial-success response shape.
  */
-export function addRules(
+export async function addRules(
   repository: RuleRepository,
   type: RuleType,
   rawValues: string[],
   mode: RuleMode,
-): AddedRule[] {
+): Promise<AddedRule[]> {
   const rules = rawValues.map((rawValue) => Rule.build(type, rawValue));
 
-  return rules.map((rule) => ({ id: repository.add(rule, mode), rule }));
+  return Promise.all(rules.map(async (rule) => ({ id: await repository.add(rule, mode), rule })));
 }

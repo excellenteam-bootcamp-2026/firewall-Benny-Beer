@@ -8,8 +8,11 @@ export interface StoredRule {
 }
 
 export interface RuleRepository {
-  add(rule: Rule, mode: RuleMode): number;
-  search(id: number): StoredRule | undefined;
-  delete(id: number): StoredRule | undefined;
-  findAll(type?: RuleType): StoredRule[];
+  add(rule: Rule, mode: RuleMode): Promise<number>;
+  search(id: number): Promise<StoredRule | undefined>;
+  searchMany(ids: number[]): Promise<StoredRule[]>;
+  delete(id: number): Promise<StoredRule | undefined>;
+  deleteMany(ids: number[]): Promise<StoredRule[]>;
+  updateStatusMany(ids: number[], active: boolean): Promise<StoredRule[]>;
+  findAll(type?: RuleType): Promise<StoredRule[]>;
 }

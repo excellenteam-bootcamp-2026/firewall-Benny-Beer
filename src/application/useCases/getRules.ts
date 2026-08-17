@@ -18,12 +18,12 @@ const KEY_BY_TYPE: Record<RuleType, 'ips' | 'domains' | 'ports'> = {
   port: 'ports',
 };
 
-export function getRules(repository: RuleRepository, type?: RuleType): Record<string, RuleBucket> {
+export async function getRules(repository: RuleRepository, type?: RuleType): Promise<Record<string, RuleBucket>> {
   const types: RuleType[] = type ? [type] : [...RULE_TYPES];
   const result: Record<string, RuleBucket> = {};
 
   for (const t of types) {
-    const rules = repository.findAll(t);
+    const rules = await repository.findAll(t);
 
     result[KEY_BY_TYPE[t]] = {
       blacklist: rules

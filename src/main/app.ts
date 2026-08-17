@@ -1,11 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { InMemoryRuleRepository } from '../adapters/output/persistence/inMemory/InMemoryRuleRepository';
+import { DrizzleRuleRepository } from '../adapters/output/persistence/postgres/DrizzleRuleRepository';
 import { FirewallController } from '../adapters/input/controller/FirewallController';
 import { createFirewallRouter } from '../adapters/input/http/FirewallRouter';
 import { errorHandler } from '../adapters/input/http/ErrorHandler';
 import { config } from './env';
 
-const repository = new InMemoryRuleRepository();
+const repository = new DrizzleRuleRepository();
 const controller = new FirewallController(repository);
 
 const app = express();

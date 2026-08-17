@@ -10,10 +10,10 @@ import { AddRuleRequest, RemoveRulesRequest, UpdateStatusRequest } from '../http
 export class FirewallController {
   constructor(private repository: RuleRepository) {}
 
-  addRule = (type: RuleType) => (req: Request, res: Response): void => {
+  addRule = (type: RuleType) => async (req: Request, res: Response): Promise<void> => {
     const { values, mode } = req.body as AddRuleRequest;
 
-    const added = addRules(this.repository, type, values, mode);
+    const added = await addRules(this.repository, type, values, mode);
 
     res.status(201).json({
       type,
@@ -23,10 +23,10 @@ export class FirewallController {
     });
   };
 
-  removeRules = (req: Request, res: Response): void => {
+  removeRules = async (req: Request, res: Response): Promise<void> => {
     const { ids } = req.body as RemoveRulesRequest;
 
-    const removed = removeRules(this.repository, ids);
+    const removed = await removeRules(this.repository, ids);
 
     res.status(200).json({
       removed: removed.map(({ id, rule, mode }) => ({
@@ -40,16 +40,16 @@ export class FirewallController {
     });
   };
 
-  getRules = (req: Request, res: Response): void => {
+  getRules = async (req: Request, res: Response): Promise<void> => {
     const type = req.query.type as RuleType | undefined;
 
-    res.status(200).json(getRules(this.repository, type));
+    res.status(200).json(await getRules(this.repository, type));
   };
 
-  updateStatus = (req: Request, res: Response): void => {
+  updateStatus = async (req: Request, res: Response): Promise<void> => {
     const { ids, active } = req.body as UpdateStatusRequest;
 
-    const updated = updateRuleStatus(this.repository, ids, active);
+    const updated = await updateRuleStatus(this.repository, ids, active);
 
     res.status(200).json({
       updated: updated.map(({ id, rule, mode }) => ({

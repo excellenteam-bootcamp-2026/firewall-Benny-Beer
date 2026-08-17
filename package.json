@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node --env-file-if-exists=.env dist/main/index.js",
     "dev": "tsx watch --env-file-if-exists=.env src/main/index.ts",
-    "test": "tsx --test \"tests/**/*.test.ts\""
+    "test": "tsx --env-file-if-exists=.env --test \"tests/**/*.test.ts\""
   },
   "keywords": [],
   "author": "",

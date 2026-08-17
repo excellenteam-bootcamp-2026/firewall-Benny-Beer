@@ -5,20 +5,18 @@ import { RuleNotFoundError } from '../errors';
  * Looks up every id before mutating any, so a single missing id rejects the
  * whole batch — same all-or-nothing contract as addRules.
  */
-export function updateRuleStatus(
+export async function updateRuleStatus(
   repository: RuleRepository,
   ids: number[],
   active: boolean,
-): StoredRule[] {
-  const found = ids.map((id) => repository.search(id));
-  const missing = ids.filter((_, i) => !found[i]);
+): Promise<StoredRule[]> {
+  const found = await repository.searchMany(ids);
+  const foundIds = new Set(found.map((stored) => stored.id));
+  const missing = ids.filter((id) => !foundIds.has(id));
 
   if (missing.length > 0) {
     throw new RuleNotFoundError(`Rule id(s) not found: ${missing.join(', ')}`);
   }
 
-  const storedRules = found as StoredRule[];
-  storedRules.forEach(({ rule }) => (active ? rule.activate() : rule.deactivate()));
-
-  return storedRules;
+  return repository.updateStatusMany(ids, active);
 }
