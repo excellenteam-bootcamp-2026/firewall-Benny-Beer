@@ -3,6 +3,12 @@ import { InvalidRequestError } from './Errors';
 import { InvalidRuleValueError } from '../../../domain/rules';
 import { RuleNotFoundError } from '../../../application/errors';
 
+const BODY_PARSER_ERROR_CODES: Record<string, string> = {
+  'entity.parse.failed': 'INVALID_REQUEST',
+  'entity.too.large': 'PAYLOAD_TOO_LARGE',
+  'encoding.unsupported': 'UNSUPPORTED_MEDIA_TYPE',
+};
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -24,8 +30,13 @@ export function errorHandler(
     return;
   }
 
-  if (err instanceof SyntaxError && (err as { type?: string }).type === 'entity.parse.failed') {
-    res.status(400).json({ status: 'error', code: 'INVALID_REQUEST', message: 'Request body is not valid JSON.' });
+  const bodyParserErr = err as { status?: number; type?: string; message?: string };
+  if (typeof bodyParserErr.status === 'number' && bodyParserErr.status < 500 && bodyParserErr.type) {
+    res.status(bodyParserErr.status).json({
+      status: 'error',
+      code: BODY_PARSER_ERROR_CODES[bodyParserErr.type] ?? 'INVALID_REQUEST',
+      message: bodyParserErr.message ?? 'Invalid request body.',
+    });
     return;
   }
 
