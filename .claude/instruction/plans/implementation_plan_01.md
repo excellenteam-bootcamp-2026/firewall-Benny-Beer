@@ -37,7 +37,7 @@ forces everything to a string.
 echoes `22`/`443` as JSON numbers, not `"22"`/`"443"`. Re-run IP/domain tests to confirm they still pass
 unchanged (they only ever send strings).
 
-## 3. Implement duplicate-value rejection (global, 409)
+## [x] 3. Implement duplicate-value rejection (global, 409)
 
 **Not in the written spec**, but now a decided design: reject a duplicate on `(type, value)` **globally**
 — a value can only exist in one list (blacklist or whitelist) at a time, not independently in both.

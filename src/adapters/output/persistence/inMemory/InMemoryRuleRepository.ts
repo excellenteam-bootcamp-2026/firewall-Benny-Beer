@@ -45,4 +45,11 @@ export class InMemoryRuleRepository implements RuleRepository {
     const all = Array.from(this.rulesById.values());
     return type ? all.filter((stored) => stored.rule.type === type) : all;
   }
+
+  async findByValue(type: RuleType, values: (string | number)[]): Promise<StoredRule[]> {
+    const valueSet = new Set(values.map(String));
+    return Array.from(this.rulesById.values()).filter(
+      (stored) => stored.rule.type === type && valueSet.has(String(stored.rule.value)),
+    );
+  }
 }

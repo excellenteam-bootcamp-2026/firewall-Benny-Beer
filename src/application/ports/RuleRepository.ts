@@ -15,4 +15,6 @@ export interface RuleRepository {
   deleteMany(ids: number[]): Promise<StoredRule[]>;
   updateStatusMany(ids: number[], active: boolean): Promise<StoredRule[]>;
   findAll(type?: RuleType): Promise<StoredRule[]>;
+  /** Finds existing rules of `type` whose value matches any of `values`, across both modes. */
+  findByValue(type: RuleType, values: (string | number)[]): Promise<StoredRule[]>;
 }

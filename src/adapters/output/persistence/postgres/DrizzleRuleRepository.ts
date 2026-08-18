@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from './db';
 import { domainRules, ipRules, portRules, ruleIndex } from './schema';
 import { Rule, RULE_TYPES, RuleType } from '../../../../domain/rules';
@@ -108,6 +108,27 @@ export class DrizzleRuleRepository implements RuleRepository {
     const values = await fetchValues(groupIdsByType(rows));
 
     return rows.map((row) => toStoredRule(row, values.get(row.id)!));
+  }
+
+  async findByValue(type: RuleType, values: (string | number)[]): Promise<StoredRule[]> {
+    if (values.length === 0) return [];
+
+    const table = TYPE_TABLE[type];
+    const stringValues = values.map(String);
+
+    const rows = await db
+      .select({
+        id: ruleIndex.id,
+        type: ruleIndex.type,
+        mode: ruleIndex.mode,
+        active: ruleIndex.active,
+        value: table.value,
+      })
+      .from(ruleIndex)
+      .innerJoin(table, eq(table.id, ruleIndex.id))
+      .where(and(eq(ruleIndex.type, type), inArray(table.value, stringValues)));
+
+    return rows.map((row) => toStoredRule(row, row.value));
   }
 
   async findAll(type?: RuleType): Promise<StoredRule[]> {

@@ -4,3 +4,12 @@ export class RuleNotFoundError extends Error {
     this.name = 'RuleNotFoundError';
   }
 }
+
+export class DuplicateRuleError extends Error {
+  readonly code = 'DUPLICATE_RULE';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'DuplicateRuleError';
+  }
+}

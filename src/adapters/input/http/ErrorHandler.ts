@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { InvalidRequestError } from './Errors';
 import { InvalidRuleValueError } from '../../../domain/rules';
-import { RuleNotFoundError } from '../../../application/errors';
+import { RuleNotFoundError, DuplicateRuleError } from '../../../application/errors';
 
 const BODY_PARSER_ERROR_CODES: Record<string, string> = {
   'entity.parse.failed': 'INVALID_REQUEST',
@@ -27,6 +27,11 @@ export function errorHandler(
 
   if (err instanceof RuleNotFoundError) {
     res.status(404).json({ status: 'error', code: 'RULE_NOT_FOUND', message: err.message });
+    return;
+  }
+
+  if (err instanceof DuplicateRuleError) {
+    res.status(409).json({ status: 'error', code: err.code, message: err.message });
     return;
   }
 
