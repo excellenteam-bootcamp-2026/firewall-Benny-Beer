@@ -64,6 +64,19 @@ test('POST /api/firewall/ports adds port rules and echoes numeric values', async
   assert.equal(typeof body.values[0].value, 'number');
 });
 
+test('POST /api/firewall/ips rejects a duplicate value with 409, even across modes', async () => {
+  const first = await request('POST', '/ips', { values: ['7.7.7.7'], mode: 'blacklist' });
+  assert.equal(first.status, 201);
+
+  const sameMode = await request('POST', '/ips', { values: ['7.7.7.7'], mode: 'blacklist' });
+  assert.equal(sameMode.status, 409);
+  assert.equal(sameMode.body.code, 'DUPLICATE_RULE');
+
+  const otherMode = await request('POST', '/ips', { values: ['7.7.7.7'], mode: 'whitelist' });
+  assert.equal(otherMode.status, 409);
+  assert.equal(otherMode.body.code, 'DUPLICATE_RULE');
+});
+
 test('GET /api/firewall/rules?type=ip returns only ip rules', async () => {
   await request('POST', '/ips', { values: ['3.3.3.3'], mode: 'blacklist' });
   await request('POST', '/ports', { values: ['443'], mode: 'whitelist' });

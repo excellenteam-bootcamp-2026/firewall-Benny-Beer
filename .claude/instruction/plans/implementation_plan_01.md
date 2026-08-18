@@ -58,7 +58,7 @@ unchanged (they only ever send strings).
 the *other* mode (blacklist → whitelist) and confirm it's also rejected with 409, since the rule is
 global.
 
-## 4. Close the test gaps
+## [x] 4. Close the test gaps
 
 Three independent gaps, each addable without touching production code:
 
