@@ -1,24 +1,13 @@
 import { z } from 'zod';
 
-function hasPort(uri: string): boolean {
-  try {
-    return new URL(uri).port !== '';
-  } catch {
-    return false;
-  }
-}
-
 const envSchema = z.object({
   ENV: z.enum(['dev', 'production']),
   PORT: z.coerce.number().int().min(1).max(65535),
-  DATABASE_URI_DEV: z
-    .string()
-    .url()
-    .refine(hasPort, 'must include a port, e.g. postgresql://user:pass@host:5432/db'),
-  DATABASE_URI_PRODUCTION: z
-    .string()
-    .url()
-    .refine(hasPort, 'must include a port, e.g. postgresql://user:pass@host:5432/db'),
+  DB_HOST: z.string().min(1),
+  DB_PORT: z.coerce.number().int().min(1).max(65535),
+  DB_USER: z.string().min(1),
+  DB_PASSWORD: z.string(),
+  DB_NAME: z.string().min(1),
   DB_CONNECTION_INTERVAL: z.coerce.number().int().positive(),
 });
 
@@ -38,17 +27,14 @@ if (!parsed.success) {
 
 const env = parsed.data;
 
-const DATABASE_URI_BY_ENV: Record<typeof env.ENV, string> = {
-  dev: env.DATABASE_URI_DEV,
-  production: env.DATABASE_URI_PRODUCTION,
-};
+const databaseUri = `postgresql://${encodeURIComponent(env.DB_USER)}:${encodeURIComponent(env.DB_PASSWORD)}@${env.DB_HOST}:${env.DB_PORT}/${env.DB_NAME}`;
 
 export const API_PREFIX = '/api/firewall';
 
 export const config = {
   env: env.ENV,
   port: env.PORT,
-  databaseUri: DATABASE_URI_BY_ENV[env.ENV],
+  databaseUri,
   dbConnectionInterval: env.DB_CONNECTION_INTERVAL,
   apiPrefix: API_PREFIX,
 } as const;

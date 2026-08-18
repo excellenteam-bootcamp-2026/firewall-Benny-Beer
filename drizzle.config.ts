@@ -7,9 +7,7 @@ export default defineConfig({
   schema: './src/adapters/output/persistence/postgres/schema.ts',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.ENV === 'production'
-      ? process.env.DATABASE_URI_PRODUCTION!
-      : process.env.DATABASE_URI_DEV!,
+    url: `postgresql://${encodeURIComponent(process.env.DB_USER!)}:${encodeURIComponent(process.env.DB_PASSWORD!)}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
   },
   verbose: true,
   strict: true,

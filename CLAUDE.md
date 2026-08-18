@@ -8,14 +8,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev       # dev server with hot-reload (tsx watch, no compile needed)
 npm run build     # compile TypeScript → dist/
 npm start         # run compiled output (requires build first)
-npm test          # run unit tests (node:test via tsx)
-npx tsx --test tests/unit/domain/rules/IpRule.test.ts   # run a single test file
+npm test          # run all tests (node:test via tsx) — includes integration tests that hit a real Postgres DB
+npx tsx --env-file-if-exists=.env --test tests/unit/domain/rules/IpRule.test.ts   # run a single test file
 ```
 
+All three run scripts load `.env` via Node's `--env-file-if-exists` flag (not dotenv on the app side —
+`drizzle.config.ts` is the one place that still uses the `dotenv` package, since drizzle-kit runs outside
+these scripts). Copy `.env.example` to `.env` before running anything; `env.ts` (see below) exits the
+process immediately if required variables are missing or malformed.
+
 `tests/` mirrors `src/`'s layout (e.g. `tests/unit/domain/rules/IpRule.test.ts` tests `src/domain/rules/IpRule.ts`).
+`tests/integration/*` requires a reachable Postgres database (`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`) with migrations applied —
+they `db.delete(ruleIndex)` in `beforeEach`, which cascades to the type tables.
 
 `tsx` runs TypeScript directly. Do not reintroduce `ts-node` — it is incompatible with the
 installed `typescript` v7 (the Go rewrite) and crashes on load.
+
+### Database migrations (drizzle-kit)
+
+Schema lives in `src/adapters/output/persistence/postgres/schema.ts`; migrations are generated into
+`src/adapters/output/persistence/postgres/drizzle/migrations/`. Use `npx drizzle-kit generate` /
+`npx drizzle-kit migrate` (config: `drizzle.config.ts`, builds the connection URL from `DB_HOST`/`DB_PORT`/
+`DB_USER`/`DB_PASSWORD`/`DB_NAME` in `.env`).
 
 ## Architecture
 
@@ -28,17 +42,19 @@ src/
 │                    # branded value types with their validation, InvalidRuleValueError
 ├── application/
 │   ├── ports/       # RuleRepository — what the app needs from the outside world
-│   └── useCases/    # addRules — orchestration, depends only on ports
+│   ├── useCases/    # addRules, removeRules, updateRuleStatus, getRules — orchestration only
+│   └── errors.ts    # RuleNotFoundError
 ├── adapters/
 │   ├── input/
 │   │   ├── controller/   # FirewallController — thin: reads body, calls use case, formats response
 │   │   └── http/         # Router, shape-validation middleware, central error handler
 │   └── output/
 │       └── persistence/
-│           ├── inMemory/  # InMemoryRuleRepository (active implementation)
-│           └── postgres/  # placeholder, not implemented
+│           ├── inMemory/  # InMemoryRuleRepository — used by unit tests, not wired into the app
+│           └── postgres/  # DrizzleRuleRepository — the live implementation (see below)
 └── main/            # Wiring only: app.ts constructs instances and registers middleware;
-                     # index.ts starts the server
+                     # index.ts waits for the DB then starts the server; env.ts / Logger.ts are
+                     # cross-cutting setup imported from here
 ```
 
 ### Key boundaries
@@ -52,42 +68,81 @@ src/
 
 Two distinct concerns, deliberately kept apart:
 
-- **Request shape** — `validateAddRuleRequest` in `adapters/input/http/Validation.ts` is the pure check (is `values` a non-empty array? is `mode` one of the two allowed strings?); `validateAddRule` in `adapters/input/http/Middleware.ts` wraps it as Express middleware and forwards failures via `next(err)`. Type-agnostic, so every add-endpoint reuses `validateAddRule` unchanged.
+- **Request shape** — `validate*Request` functions in `adapters/input/http/Validation.ts` are pure checks
+  (is `values` a non-empty array? is `mode` one of the two allowed strings? are `ids` integers?);
+  `adapters/input/http/Middleware.ts` wraps each as Express middleware and forwards failures via `next(err)`.
+  Type-agnostic, so every endpoint reuses the matching `validate*` middleware unchanged.
 - **Business rules** (`domain/rules/*Type.ts`) — is this a real IPv4 / bare domain / port in range? Throws `InvalidRuleValueError` with a `code` (`INVALID_IP`, `INVALID_DOMAIN`, `INVALID_PORT`).
 
-`ErrorHandler.ts` maps both to the spec's error response. Adding an error case means throwing a typed error, not writing status-code logic in a controller.
+`ErrorHandler.ts` maps `InvalidRequestError`, `InvalidRuleValueError`, `RuleNotFoundError`, and malformed-JSON
+`SyntaxError` to the spec's error response, then falls back to a 500. Adding an error case means throwing a
+typed error, not writing status-code logic in a controller.
 
 ### Domain model
 
-`Rule` is an abstract base class with a static registry. Each subclass calls `Rule.register(type, ctor)`
-at module load, and `Rule.build(type, rawValue)` dispatches to the right one. Registration is an
-**import side effect**, so every subclass must be listed in `domain/rules/index.ts` — importing `Rule`
-from anywhere else risks an empty registry.
+`Rule` (`domain/rules/Rule.ts`) is an abstract base class with a static registry. Each subclass calls
+`Rule.register(type, ctor)` at module load, and `Rule.build(type, rawValue, active?)` dispatches to the
+right one. Registration is an **import side effect**, so every subclass must be listed in
+`domain/rules/index.ts` — importing `Rule` from anywhere else risks an empty registry.
 
-A rule carries `value` (branded string), `type` (`'ip' | 'domain' | 'port'`), and `active` (defaults to `true`).
-`id` and `mode` (`'blacklist' | 'whitelist'`) belong to storage, not the entity — the repository assigns
-a single shared id sequence across all types and modes.
+A rule carries `value` (branded string), `type` (`'ip' | 'domain' | 'port'`), and `active` (mutable via
+`activate()`/`deactivate()`, defaults to `true`). `id` and `mode` (`'blacklist' | 'whitelist'`) belong to
+storage, not the entity — `RuleRepository.add` assigns a single shared id sequence across all types and
+modes (see `StoredRule` in `application/ports/RuleRepository.ts`).
+
+### Persistence (Postgres via Drizzle)
+
+`DrizzleRuleRepository` (`adapters/output/persistence/postgres/`) is wired into `main/app.ts` and is the
+only `RuleRepository` implementation the app actually runs on; `InMemoryRuleRepository` still exists purely
+as a test double. Storage is split across four tables (`schema.ts`): a shared `rule_index` (id, type, mode,
+active) plus one value table per type (`ip_rules`, `domain_rules`, `port_rules`), joined on `id` with
+`ON DELETE CASCADE`. `db.ts` builds the Drizzle client from `config.databaseUri`; `connect.ts` exposes
+`connectWithRetry` (fixed-interval "stop-and-wait") and `connectWithBackoff` (exponential, capped) —
+`main/index.ts` calls `connectWithRetry` before `app.listen`, so the server does not start accepting
+traffic until the DB is reachable.
+
+### Environment & logging
+
+`main/env.ts` validates `process.env` with `zod` at import time (`ENV`, `PORT`, `DB_HOST`, `DB_PORT`,
+`DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_CONNECTION_INTERVAL`) and `process.exit(1)`s with the issue list
+if anything is missing or malformed — fail fast, no partially-configured app. It also builds the Postgres
+connection URI from those `DB_*` parts and exports the shared `config` object (including `databaseUri`,
+`apiPrefix`, `/api/firewall`).
+
+`main/Logger.ts` builds a Winston logger (JSON to `logs/app.log` in production, colorized console
+otherwise) and then **overrides the global `console.log`/`console.error`/`console.warn`** to route through
+it. It must be imported first in `main/index.ts` (`import './Logger'`), before anything that might log,
+so that all `console.*` calls anywhere in the codebase get picked up.
 
 ### Adding a new rule type
 
 1. Add a branded value type + `createX`/`isValidX` in `domain/rules/xType.ts` (throw `InvalidRuleValueError`).
 2. Add `XRule extends Rule` with a static `create`, ending in `Rule.register('x', XRule)`.
 3. List it in `domain/rules/index.ts` — otherwise `Rule.build('x', …)` throws "No Rule class registered".
-4. Add a controller method calling `addRules(this.repository, 'x', values, mode)`.
-5. Add one router line with the existing `validateAddRule` middleware.
+4. Add `x` to `RULE_TYPES`/`RuleType` in `domain/rules/RuleTypes.ts`.
+5. Add a table for it in `schema.ts` (id FK to `rule_index`, cascade delete) and an entry in
+   `DrizzleRuleRepository`'s `TYPE_TABLE` map, then generate/run a migration.
+6. Add a controller method calling `addRules(this.repository, 'x', values, mode)`.
+7. Add one router line with the existing `validateAddRule` middleware.
 
-No changes to the use case, validation, repository, or error handler.
+The use case layer, validation middleware, and error handler are type-agnostic and need no changes.
 
 ### API surface
 
-| Method | Path | Status |
-|---|---|---|
-| `POST` | `/api/firewall/ips` | implemented |
-| `POST` | `/api/firewall/domains` | not implemented |
-| `POST` | `/api/firewall/ports` | not implemented |
-| `DELETE` | `/api/firewall/rules` | not implemented |
-| `GET` | `/api/firewall/rules` | not implemented |
-| `PATCH` | `/api/firewall/rules/status` | not implemented |
+All routes are mounted under `config.apiPrefix` (`/api/firewall`) and are implemented:
+
+| Method | Path |
+|---|---|
+| `POST` | `/api/firewall/ips` |
+| `POST` | `/api/firewall/domains` |
+| `POST` | `/api/firewall/ports` |
+| `DELETE` | `/api/firewall/rules` |
+| `GET` | `/api/firewall/rules` |
+| `PATCH` | `/api/firewall/rules/status` |
+
+`addRules`, `removeRules`, and `updateRuleStatus` are all-or-nothing per batch: `removeRules` and
+`updateRuleStatus` look up every id first and throw `RuleNotFoundError` if any are missing before mutating
+anything; `addRules` builds every `Rule` (which validates) before persisting any of them.
 
 ## Conventions
 
