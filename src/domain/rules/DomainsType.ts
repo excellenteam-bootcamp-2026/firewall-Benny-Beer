@@ -2,8 +2,8 @@ import { InvalidRuleValueError } from './errors';
 
 export type Domain = string & { readonly __brand: 'Domain' };
 
-export function createDomain(value: string): Domain {
-  if (!isValidDomain(value)) {
+export function createDomain(value: string | number): Domain {
+  if (typeof value !== 'string' || !isValidDomain(value)) {
     throw new InvalidRuleValueError('INVALID_DOMAIN', `Invalid domain: ${value}`);
   }
   return value.toLowerCase() as Domain;

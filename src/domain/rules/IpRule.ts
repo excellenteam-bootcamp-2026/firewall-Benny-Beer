@@ -9,7 +9,7 @@ export class IpRule extends Rule {
     super(value, active);
   }
 
-  static create(rawValue: string, active?: boolean): IpRule {
+  static create(rawValue: string | number, active?: boolean): IpRule {
     const ip = createIP(rawValue); // throws if invalid
     return new IpRule(ip.toString(), active);
   }

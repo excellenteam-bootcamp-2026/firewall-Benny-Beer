@@ -2,7 +2,7 @@ import { InvalidRequestError } from './Errors';
 import { RuleMode, RuleType, RULE_TYPES } from '../../../domain/rules';
 
 export interface AddRuleRequest {
-  values: string[];
+  values: (string | number)[];
   mode: RuleMode;
 }
 
@@ -38,7 +38,7 @@ export function validateAddRuleRequest(body: unknown): AddRuleRequest {
     throw new InvalidRequestError('values must contain only strings or numbers.');
   }
 
-  return { values: values.map(String), mode };
+  return { values: values as (string | number)[], mode };
 }
 
 function validateIds(ids: unknown): number[] {

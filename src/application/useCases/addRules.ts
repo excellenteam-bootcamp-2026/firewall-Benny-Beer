@@ -13,7 +13,7 @@ export interface AddedRule {
 export async function addRules(
   repository: RuleRepository,
   type: RuleType,
-  rawValues: string[],
+  rawValues: (string | number)[],
   mode: RuleMode,
 ): Promise<AddedRule[]> {
   const rules = rawValues.map((rawValue) => Rule.build(type, rawValue));

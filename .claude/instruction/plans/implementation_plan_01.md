@@ -17,7 +17,7 @@ of checking `SyntaxError` specifically. Keep the spec's error response shape (`{
 **Verify:** add a case to whatever test currently exercises the malformed-JSON path (or a new one) that
 POSTs an oversized body and an unsupported `Content-Type`/encoding, asserting 413 and 415 respectively.
 
-## 2. Stop `values.map(String)` from corrupting port numbers
+## [x] 2. Stop `values.map(String)` from corrupting port numbers
 
 **Problem:** `Validation.ts:32` stringifies every element of `values`, so `POST /api/firewall/ports` will
 echo `"22"` instead of the spec's `22`. `Rule.value` is already typed `string | number`

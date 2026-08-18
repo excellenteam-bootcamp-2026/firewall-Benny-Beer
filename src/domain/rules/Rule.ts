@@ -30,7 +30,7 @@ export abstract class Rule {
   }
 
   /** Generic factory — looks up the right subclass by type and delegates. */
-  static build(type: RuleType, rawValue: string, active?: boolean): Rule {
+  static build(type: RuleType, rawValue: string | number, active?: boolean): Rule {
     const ctor = Rule.registry.get(type);
     if (!ctor) {
         throw new Error(`No Rule class registered for type "${type}"`);
@@ -41,6 +41,6 @@ export abstract class Rule {
 
 /** The shape every concrete Rule subclass's static side must satisfy. */
 export interface RuleConstructor {
-  create(rawValue: string, active?: boolean): Rule;
+  create(rawValue: string | number, active?: boolean): Rule;
 
 }

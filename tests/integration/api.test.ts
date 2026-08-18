@@ -56,11 +56,12 @@ test('POST /api/firewall/domains adds domain rules', async () => {
   assert.equal(body.values[0].value, 'example.com');
 });
 
-test('POST /api/firewall/ports adds port rules', async () => {
-  const { status, body } = await request('POST', '/ports', { values: ['8080'], mode: 'blacklist' });
+test('POST /api/firewall/ports adds port rules and echoes numeric values', async () => {
+  const { status, body } = await request('POST', '/ports', { values: [8080], mode: 'blacklist' });
 
   assert.equal(status, 201);
-  assert.equal(body.values[0].value, '8080');
+  assert.equal(body.values[0].value, 8080);
+  assert.equal(typeof body.values[0].value, 'number');
 });
 
 test('GET /api/firewall/rules?type=ip returns only ip rules', async () => {

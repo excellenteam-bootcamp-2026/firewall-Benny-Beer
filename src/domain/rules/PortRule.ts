@@ -5,13 +5,13 @@ import { createPort } from './portType';
 export class PortRule extends Rule {
   readonly type: RuleType = 'port';
 
-  private constructor(value: string, active?: boolean) {
+  private constructor(value: number, active?: boolean) {
     super(value, active);
   }
 
-  static create(rawValue: string, active?: boolean): PortRule {
+  static create(rawValue: string | number, active?: boolean): PortRule {
     const port = createPort(rawValue); // throws if invalid
-    return new PortRule(port.toString(), active);
+    return new PortRule(port, active);
   }
 }
 

@@ -9,7 +9,7 @@ export class DomainRule extends Rule {
     super(value, active);
   }
 
-  static create(rawValue: string, active?: boolean): DomainRule {
+  static create(rawValue: string | number, active?: boolean): DomainRule {
     const domain = createDomain(rawValue); // throws if invalid
     return new DomainRule(domain.toString(), active);
   }

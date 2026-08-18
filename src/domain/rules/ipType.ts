@@ -2,8 +2,8 @@ import { InvalidRuleValueError } from './errors';
 
 export type IP = string & { readonly __brand: 'IP' };
 
-export function createIP(value: string): IP {
-  if (!isValidIPv4(value)) {
+export function createIP(value: string | number): IP {
+  if (typeof value !== 'string' || !isValidIPv4(value)) {
     throw new InvalidRuleValueError('INVALID_IP', `Invalid IPv4 address: ${value}`);
   }
   return value as IP;
