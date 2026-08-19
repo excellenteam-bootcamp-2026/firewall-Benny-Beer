@@ -24,6 +24,21 @@ they `db.delete(ruleIndex)` in `beforeEach`, which cascades to the type tables.
 `tsx` runs TypeScript directly. Do not reintroduce `ts-node` — it is incompatible with the
 installed `typescript` v7 (the Go rewrite) and crashes on load.
 
+### Docker
+
+Multi-stage `Dockerfile` (`builder` compiles TS, `production` runs `dist/` only, as a non-root user).
+Three Compose files select which `.env.*` file backs the `postgres`/`backend` services — `docker compose`
+alone does not pick one for you:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build      # dev — uses .env.dev, Postgres port 5432 published
+docker compose -f docker-compose.prod.yml up --build -d  # prod — uses .env.prod, Postgres not published to host
+docker compose up --build                                 # base — uses .env, ports from PORT/DB_PORT vars
+```
+
+In all three, `backend`'s `DB_HOST` is overridden to `postgres` (the Compose service name) regardless of what
+`.env*` says, and `backend` waits on `postgres`'s healthcheck before starting.
+
 ### Database migrations (drizzle-kit)
 
 Schema lives in `src/adapters/output/persistence/postgres/schema.ts`; migrations are generated into
