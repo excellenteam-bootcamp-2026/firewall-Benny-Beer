@@ -74,7 +74,7 @@ Three independent gaps, each addable without touching production code:
   PDF (status codes, error `{status, code, message}` shape, the widened port-number response) — this is
   the only layer that would have caught bugs 1 and 2 in the first place.
 
-## 5. Clean the stale `dist/`
+## [x] 5. Clean the stale `dist/`
 
 **Problem:** `dist/` still contains `applications/`, `core/`, `infrastructure/` — directory names from
 before the hexagonal refactor, no longer present in `src/`.
