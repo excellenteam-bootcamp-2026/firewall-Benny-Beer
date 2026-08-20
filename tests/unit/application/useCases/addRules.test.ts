@@ -1,40 +1,45 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import { addRules } from '../../../../src/application/useCases/addRules';
 import { InMemoryRuleRepository } from '../../../../src/adapters/output/persistence/inMemory/InMemoryRuleRepository';
 import { DuplicateRuleError } from '../../../../src/application/errors';
+import { InvalidRuleValueError } from '../../../../src/domain/rules';
 
-test('addRules persists every value and assigns increasing ids', async () => {
-  const repo = new InMemoryRuleRepository();
+describe('addRules', () => {
+  test('persists every value and assigns increasing ids', async () => {
+    const repo = new InMemoryRuleRepository();
 
-  const added = await addRules(repo, 'ip', ['1.1.1.1', '2.2.2.2'], 'blacklist');
+    const added = await addRules(repo, 'ip', ['1.1.1.1', '2.2.2.2'], 'blacklist');
 
-  assert.deepEqual(
-    added.map(({ id, rule }) => ({ id, value: rule.value, active: rule.active })),
-    [
+    expect(added.map(({ id, rule }) => ({ id, value: rule.value, active: rule.active }))).toEqual([
       { id: 1, value: '1.1.1.1', active: true },
       { id: 2, value: '2.2.2.2', active: true },
-    ],
-  );
-});
+    ]);
+  });
 
-test('addRules rejects the whole batch without persisting when one value is invalid', async () => {
-  const repo = new InMemoryRuleRepository();
+  test('rejects the whole batch without persisting anything when one value is invalid', async () => {
+    const repo = new InMemoryRuleRepository();
 
-  await assert.rejects(() => addRules(repo, 'ip', ['1.1.1.1', 'not-an-ip'], 'blacklist'));
-  assert.equal(await repo.search(1), undefined);
-});
+    await expect(addRules(repo, 'ip', ['1.1.1.1', 'not-an-ip'], 'blacklist')).rejects.toThrow(
+      InvalidRuleValueError,
+    );
 
-test('addRules rejects a value that already exists in the same mode', async () => {
-  const repo = new InMemoryRuleRepository();
-  await addRules(repo, 'ip', ['1.1.1.1'], 'blacklist');
+    expect(await repo.findAll('ip')).toHaveLength(0);
+  });
 
-  await assert.rejects(() => addRules(repo, 'ip', ['1.1.1.1'], 'blacklist'), DuplicateRuleError);
-});
+  test('rejects a value that already exists in the same mode, and does not create a second row', async () => {
+    const repo = new InMemoryRuleRepository();
+    await addRules(repo, 'ip', ['1.1.1.1'], 'blacklist');
 
-test('addRules rejects a value that already exists in the other mode (global uniqueness)', async () => {
-  const repo = new InMemoryRuleRepository();
-  await addRules(repo, 'ip', ['1.1.1.1'], 'blacklist');
+    await expect(addRules(repo, 'ip', ['1.1.1.1'], 'blacklist')).rejects.toThrow(DuplicateRuleError);
 
-  await assert.rejects(() => addRules(repo, 'ip', ['1.1.1.1'], 'whitelist'), DuplicateRuleError);
+    expect(await repo.findAll('ip')).toHaveLength(1);
+  });
+
+  test('rejects a value that already exists in the other mode (global uniqueness), and does not create a second row', async () => {
+    const repo = new InMemoryRuleRepository();
+    await addRules(repo, 'ip', ['1.1.1.1'], 'blacklist');
+
+    await expect(addRules(repo, 'ip', ['1.1.1.1'], 'whitelist')).rejects.toThrow(DuplicateRuleError);
+
+    expect(await repo.findAll('ip')).toHaveLength(1);
+  });
 });

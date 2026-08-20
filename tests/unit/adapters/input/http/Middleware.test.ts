@@ -1,5 +1,3 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
 import {
   validateAddRule,
@@ -9,83 +7,85 @@ import {
 } from '../../../../../src/adapters/input/http/Middleware';
 import { InvalidRequestError } from '../../../../../src/adapters/input/http/Errors';
 
-function nextSpy(): { next: (err?: unknown) => void; calls: unknown[] } {
-  const calls: unknown[] = [];
-  return { next: (err?: unknown) => calls.push(err), calls };
-}
+describe('validateAddRule', () => {
+  test('replaces req.body with the validated shape and calls next() with no error', () => {
+    const req = { body: { values: ['1.1.1.1'], mode: 'blacklist' } } as Request;
+    const next = jest.fn();
 
-test('validateAddRule replaces req.body with the validated shape and calls next() with no error', () => {
-  const req = { body: { values: ['1.1.1.1'], mode: 'blacklist' } } as Request;
-  const { next, calls } = nextSpy();
+    validateAddRule(req, {} as Response, next);
 
-  validateAddRule(req, {} as Response, next);
+    expect(req.body).toEqual({ values: ['1.1.1.1'], mode: 'blacklist' });
+    expect(next).toHaveBeenCalledWith();
+  });
 
-  assert.deepEqual(req.body, { values: ['1.1.1.1'], mode: 'blacklist' });
-  assert.deepEqual(calls, [undefined]);
+  test('forwards the InvalidRequestError to next() on a malformed body', () => {
+    const req = { body: { values: [], mode: 'blacklist' } } as unknown as Request;
+    const next = jest.fn();
+
+    validateAddRule(req, {} as Response, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(InvalidRequestError));
+  });
 });
 
-test('validateAddRule forwards the InvalidRequestError to next() on a malformed body', () => {
-  const req = { body: { values: [], mode: 'blacklist' } } as unknown as Request;
-  const { next, calls } = nextSpy();
+describe('validateRemoveRules', () => {
+  test('replaces req.body and calls next() with no error', () => {
+    const req = { body: { ids: [1, 2] } } as unknown as Request;
+    const next = jest.fn();
 
-  validateAddRule(req, {} as Response, next);
+    validateRemoveRules(req, {} as Response, next);
 
-  assert.equal(calls.length, 1);
-  assert.ok(calls[0] instanceof InvalidRequestError);
+    expect(req.body).toEqual({ ids: [1, 2] });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  test('forwards the error on invalid ids', () => {
+    const req = { body: { ids: [] } } as unknown as Request;
+    const next = jest.fn();
+
+    validateRemoveRules(req, {} as Response, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(InvalidRequestError));
+  });
 });
 
-test('validateRemoveRules replaces req.body and calls next() with no error', () => {
-  const req = { body: { ids: [1, 2] } } as unknown as Request;
-  const { next, calls } = nextSpy();
+describe('validateUpdateStatus', () => {
+  test('replaces req.body and calls next() with no error', () => {
+    const req = { body: { ids: [1], active: true } } as unknown as Request;
+    const next = jest.fn();
 
-  validateRemoveRules(req, {} as Response, next);
+    validateUpdateStatus(req, {} as Response, next);
 
-  assert.deepEqual(req.body, { ids: [1, 2] });
-  assert.deepEqual(calls, [undefined]);
+    expect(req.body).toEqual({ ids: [1], active: true });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  test('forwards the error on a non-boolean active flag', () => {
+    const req = { body: { ids: [1], active: 'yes' } } as unknown as Request;
+    const next = jest.fn();
+
+    validateUpdateStatus(req, {} as Response, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(InvalidRequestError));
+  });
 });
 
-test('validateRemoveRules forwards the error on invalid ids', () => {
-  const req = { body: { ids: [] } } as unknown as Request;
-  const { next, calls } = nextSpy();
+describe('validateGetRules', () => {
+  test('calls next() with no error for a supported type', () => {
+    const req = { query: { type: 'ip' } } as unknown as Request;
+    const next = jest.fn();
 
-  validateRemoveRules(req, {} as Response, next);
+    validateGetRules(req, {} as Response, next);
 
-  assert.ok(calls[0] instanceof InvalidRequestError);
-});
+    expect(next).toHaveBeenCalledWith();
+  });
 
-test('validateUpdateStatus replaces req.body and calls next() with no error', () => {
-  const req = { body: { ids: [1], active: true } } as unknown as Request;
-  const { next, calls } = nextSpy();
+  test('forwards the error for an unsupported type', () => {
+    const req = { query: { type: 'mac' } } as unknown as Request;
+    const next = jest.fn();
 
-  validateUpdateStatus(req, {} as Response, next);
+    validateGetRules(req, {} as Response, next);
 
-  assert.deepEqual(req.body, { ids: [1], active: true });
-  assert.deepEqual(calls, [undefined]);
-});
-
-test('validateUpdateStatus forwards the error on a non-boolean active flag', () => {
-  const req = { body: { ids: [1], active: 'yes' } } as unknown as Request;
-  const { next, calls } = nextSpy();
-
-  validateUpdateStatus(req, {} as Response, next);
-
-  assert.ok(calls[0] instanceof InvalidRequestError);
-});
-
-test('validateGetRules calls next() with no error for a supported type', () => {
-  const req = { query: { type: 'ip' } } as unknown as Request;
-  const { next, calls } = nextSpy();
-
-  validateGetRules(req, {} as Response, next);
-
-  assert.deepEqual(calls, [undefined]);
-});
-
-test('validateGetRules forwards the error for an unsupported type', () => {
-  const req = { query: { type: 'mac' } } as unknown as Request;
-  const { next, calls } = nextSpy();
-
-  validateGetRules(req, {} as Response, next);
-
-  assert.ok(calls[0] instanceof InvalidRequestError);
+    expect(next).toHaveBeenCalledWith(expect.any(InvalidRequestError));
+  });
 });
