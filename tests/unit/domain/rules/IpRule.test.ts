@@ -1,16 +1,20 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import { IpRule } from '../../../../src/domain/rules/IpRule';
 import { InvalidRuleValueError } from '../../../../src/domain/rules/errors';
 
-test('IpRule.create builds a rule for a valid IPv4 address', () => {
-  const rule = IpRule.create('192.168.1.1');
+describe('IpRule.create', () => {
+  test('builds a rule for a valid IPv4 address, active by default', () => {
+    const rule = IpRule.create('192.168.1.1');
 
-  assert.equal(rule.value, '192.168.1.1');
-  assert.equal(rule.type, 'ip');
-  assert.equal(rule.active, true);
-});
+    expect(rule.value).toBe('192.168.1.1');
+    expect(rule.type).toBe('ip');
+    expect(rule.active).toBe(true);
+  });
 
-test('IpRule.create rejects an invalid IPv4 address', () => {
-  assert.throws(() => IpRule.create('999.999.999.999'), InvalidRuleValueError);
+  test('honors an explicit active flag', () => {
+    expect(IpRule.create('192.168.1.1', false).active).toBe(false);
+  });
+
+  test('rejects an invalid IPv4 address', () => {
+    expect(() => IpRule.create('999.999.999.999')).toThrow(InvalidRuleValueError);
+  });
 });
