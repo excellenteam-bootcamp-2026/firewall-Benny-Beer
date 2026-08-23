@@ -1,10 +1,10 @@
 import { faker } from '@faker-js/faker';
-import { db } from '../src/adapters/output/persistence/postgres/db';
-import { ruleIndex } from '../src/adapters/output/persistence/postgres/schema';
-import { connectWithRetry } from '../src/adapters/output/persistence/postgres/connect';
-import { DrizzleRuleRepository } from '../src/adapters/output/persistence/postgres/DrizzleRuleRepository';
-import { Rule, RULE_TYPES } from '../src/domain/rules';
-import type { RuleMode, RuleType } from '../src/domain/rules';
+import { db } from '../firewall/src/adapters/output/persistence/postgres/db';
+import { ruleIndex } from '../firewall/src/adapters/output/persistence/postgres/schema';
+import { connectWithRetry } from '../firewall/src/adapters/output/persistence/postgres/connect';
+import { DrizzleRuleRepository } from '../firewall/src/adapters/output/persistence/postgres/DrizzleRuleRepository';
+import { Rule, RULE_TYPES } from '../firewall/src/domain/rules';
+import type { RuleMode, RuleType } from '../firewall/src/domain/rules';
 
 const MODES: RuleMode[] = ['blacklist', 'whitelist'];
 const ROWS_PER_COMBINATION = 10;
