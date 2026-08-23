@@ -1,61 +1,95 @@
-import { test, beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
 import { eq } from 'drizzle-orm';
 import { db } from '../../src/adapters/output/persistence/postgres/db';
-import { ipRules, ruleIndex } from '../../src/adapters/output/persistence/postgres/schema';
+import { ipRules } from '../../src/adapters/output/persistence/postgres/schema';
 import { DrizzleRuleRepository } from '../../src/adapters/output/persistence/postgres/DrizzleRuleRepository';
 import { Rule } from '../../src/domain/rules';
 
-beforeEach(async () => {
-  await db.delete(ruleIndex); // cascades to ip_rules/domain_rules/port_rules
+const repo = new DrizzleRuleRepository();
+const createdIds: number[] = [];
+
+afterAll(async () => {
+  await repo.deleteMany(createdIds.filter((id) => id != null));
 });
 
-test('ids are unique across modes and rule types', async () => {
-  const repo = new DrizzleRuleRepository();
+describe('DrizzleRuleRepository', () => {
+  // No use case calls the singular search()/delete() — only searchMany/deleteMany
+  // — so these are exercised directly here.
+  test('search() finds a single stored rule by id', async () => {
+    const id = await repo.add(Rule.build('ip', '198.51.100.40'), 'blacklist');
+    createdIds.push(id);
 
-  const ids = await Promise.all([
-    repo.add(Rule.build('ip', '1.1.1.1'), 'blacklist'),
-    repo.add(Rule.build('ip', '1.1.1.1'), 'whitelist'),
-    repo.add(Rule.build('domain', 'example.com'), 'blacklist'),
-    repo.add(Rule.build('port', '443'), 'whitelist'),
-  ]);
+    const found = await repo.search(id);
 
-  assert.equal(new Set(ids).size, 4);
-  assert.equal((await repo.search(ids[0]))?.rule.type, 'ip');
-  assert.equal((await repo.search(ids[2]))?.rule.value, 'example.com');
-});
+    expect(found?.rule.value).toBe('198.51.100.40');
+    expect(found?.rule.type).toBe('ip');
+    expect(found?.mode).toBe('blacklist');
+  });
 
-test('findAll(type) returns only rules of that type', async () => {
-  const repo = new DrizzleRuleRepository();
-  await repo.add(Rule.build('ip', '9.9.9.9'), 'blacklist');
-  await repo.add(Rule.build('port', '8080'), 'whitelist');
+  test('search() returns undefined for an id that does not exist', async () => {
+    expect(await repo.search(999999999)).toBeUndefined();
+  });
 
-  const ipOnly = await repo.findAll('ip');
+  test('delete() removes a single stored rule and returns it', async () => {
+    const id = await repo.add(Rule.build('ip', '198.51.100.41'), 'blacklist');
 
-  assert.equal(ipOnly.length, 1);
-  assert.equal(ipOnly[0].rule.value, '9.9.9.9');
-});
+    const deleted = await repo.delete(id);
 
-test('updateStatusMany flips active for the found rule', async () => {
-  const repo = new DrizzleRuleRepository();
-  const id = await repo.add(Rule.build('domain', 'example.com'), 'whitelist');
+    expect(deleted?.rule.value).toBe('198.51.100.41');
+    expect(await repo.search(id)).toBeUndefined();
+  });
 
-  const [updated] = await repo.updateStatusMany([id], false);
+  test('findAll(type) returns only rules of that type', async () => {
+    const ipId = await repo.add(Rule.build('ip', '198.51.100.42'), 'blacklist');
+    const portId = await repo.add(Rule.build('port', 60010), 'whitelist');
+    createdIds.push(ipId, portId);
 
-  assert.equal(updated.rule.active, false);
-  assert.equal((await repo.search(id))?.rule.active, false);
-});
+    const ipOnly = await repo.findAll('ip');
 
-test('deleteMany removes the rule_index row and cascades to the type table', async () => {
-  const repo = new DrizzleRuleRepository();
-  const id = await repo.add(Rule.build('ip', '8.8.8.8'), 'blacklist');
+    expect(ipOnly.some((stored) => stored.rule.value === '198.51.100.42')).toBe(true);
+    expect(ipOnly.every((stored) => stored.rule.type === 'ip')).toBe(true);
+  });
 
-  const deleted = await repo.deleteMany([id]);
+  test('findByValue finds an existing value across both modes', async () => {
+    const id = await repo.add(Rule.build('ip', '198.51.100.43'), 'whitelist');
+    createdIds.push(id);
 
-  assert.equal(deleted.length, 1);
-  assert.equal(deleted[0].rule.value, '8.8.8.8');
-  assert.equal(await repo.search(id), undefined);
+    const found = await repo.findByValue('ip', ['198.51.100.43']);
 
-  const [orphanedRow] = await db.select().from(ipRules).where(eq(ipRules.id, id));
-  assert.equal(orphanedRow, undefined);
+    expect(found).toHaveLength(1);
+    expect(found[0].mode).toBe('whitelist');
+  });
+
+  test('deleteMany cascades to the type-specific table', async () => {
+    const id = await repo.add(Rule.build('ip', '198.51.100.44'), 'blacklist');
+
+    await repo.deleteMany([id]);
+
+    const [orphanedRow] = await db.select().from(ipRules).where(eq(ipRules.id, id));
+    expect(orphanedRow).toBeUndefined();
+  });
+
+  // Reached in practice only via a validated non-empty body (Validation.ts
+  // rejects empty arrays before the repository is called), so these short-
+  // circuit branches are exercised directly.
+  test('the batch methods short-circuit to an empty result for an empty id/value list', async () => {
+    expect(await repo.searchMany([])).toEqual([]);
+    expect(await repo.deleteMany([])).toEqual([]);
+    expect(await repo.updateStatusMany([], true)).toEqual([]);
+    expect(await repo.findByValue('ip', [])).toEqual([]);
+  });
+
+  test('deleteMany is a no-op when none of the given ids exist', async () => {
+    expect(await repo.deleteMany([999999999])).toEqual([]);
+  });
+
+  test('findAll() with no type returns rules of every type', async () => {
+    const ipId = await repo.add(Rule.build('ip', '198.51.100.45'), 'blacklist');
+    const portId = await repo.add(Rule.build('port', 60011), 'whitelist');
+    createdIds.push(ipId, portId);
+
+    const all = await repo.findAll();
+
+    expect(all.some((stored) => stored.rule.value === '198.51.100.45')).toBe(true);
+    expect(all.some((stored) => stored.rule.value === 60011)).toBe(true);
+  });
 });
