@@ -5,24 +5,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # dev server with hot-reload (tsx watch, no compile needed)
-npm run build     # compile TypeScript → dist/
-npm start         # run compiled output (requires build first)
-npm test          # run all tests (node:test via tsx) — includes integration tests that hit a real Postgres DB
-npx tsx --env-file-if-exists=.env --test tests/unit/domain/rules/IpRule.test.ts   # run a single test file
+npm run dev             # dev server with hot-reload (tsx watch, no compile needed)
+npm run build           # compile TypeScript → dist/
+npm start               # run compiled output (requires build first)
+npm test                # run the Jest suite — hits a real Postgres DB, seeded once via globalSetup
+npm run test:coverage   # same, plus a coverage report (gated at 100% statements)
+npm run db:seed         # populate the dev DB with mock data (scripts/mock_data_population.ts)
+node --env-file-if-exists=.env.dev node_modules/jest/bin/jest.js tests/integration/ips.test.ts   # run a single test file
 ```
 
-All three run scripts load `.env` via Node's `--env-file-if-exists` flag (not dotenv on the app side —
-`drizzle.config.ts` is the one place that still uses the `dotenv` package, since drizzle-kit runs outside
-these scripts). Copy `.env.example` to `.env` before running anything; `env.ts` (see below) exits the
-process immediately if required variables are missing or malformed.
+`npm run dev`/`db:seed` load `.env.dev`/`.env` via Node's `--env-file-if-exists` flag (not dotenv on the
+app side — `drizzle.config.ts` is the one place that still uses the `dotenv` package, since drizzle-kit
+runs outside these scripts). Copy `.env.example` to `.env` before running anything; `env.ts` (see below)
+exits the process immediately if required variables are missing or malformed.
 
-`tests/` mirrors `src/`'s layout (e.g. `tests/unit/domain/rules/IpRule.test.ts` tests `src/domain/rules/IpRule.ts`).
-`tests/integration/*` requires a reachable Postgres database (`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`) with migrations applied —
-they `db.delete(ruleIndex)` in `beforeEach`, which cascades to the type tables.
+`tests/` mirrors `src/`'s layout under `tests/unit/**` (e.g. `tests/unit/domain/rules/IpRule.test.ts` tests
+`src/domain/rules/IpRule.ts`, using `InMemoryRuleRepository` for use-case tests) plus `tests/integration/**`
+(real Postgres + `supertest` against `src/main/app.ts`, one file per endpoint) and one
+`tests/system/happyFlow.test.ts`. A Jest `globalSetup` (`tests/globalSetup.ts`) seeds ~60 mock rows via
+`scripts/mock_data_population.ts`'s exported `populateMockData()` **once** before the whole run — tests do
+**not** wipe the DB between each other, so assertions use `.find()`/`.some()`/length-delta checks (never
+exact array equality on "all rules"), and tests that create rows use a reserved, collision-free value
+range (see comments at the top of each `tests/integration/*.test.ts` file) plus `afterAll` cleanup. Jest
+runs test files serially (`maxWorkers: 1` in `jest.config.ts`) since there's no per-test DB transaction
+isolation against the shared instance.
 
-`tsx` runs TypeScript directly. Do not reintroduce `ts-node` — it is incompatible with the
-installed `typescript` v7 (the Go rewrite) and crashes on load.
+`tsx` runs TypeScript directly (used by `dev`/`db:seed`); Jest tests are transformed by `@swc/jest`
+(syntax-only, like `tsx`/esbuild). Do not reintroduce `ts-node` or `ts-jest` — both depend on the
+`typescript` package's programmatic Compiler API, which is incompatible with the installed `typescript` v7
+(the Go rewrite) and crashes on load.
 
 ### Docker
 

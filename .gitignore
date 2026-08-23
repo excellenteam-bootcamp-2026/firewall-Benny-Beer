@@ -6,5 +6,6 @@ dist/
 *.js.map
 TODO.md
 logs/
+coverage/
 .claude/
 .vscode/
