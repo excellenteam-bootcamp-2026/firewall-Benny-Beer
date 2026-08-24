@@ -1,0 +1,21 @@
+[project]
+name = "python-rule-service"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    # Task 2: "pydantic", "pydantic-settings"
+    # Task 3: "structlog"
+    # Task 4: "sqlalchemy", "psycopg[binary]"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
